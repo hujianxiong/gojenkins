@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -431,25 +432,33 @@ func (j *Jenkins) GetAllJobs(ctx context.Context) ([]*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ErrChannel chan error
+
 	jobs := make([]*Job, len(exec.Raw.Jobs))
+	var wg sync.WaitGroup
+	wgDone := make(chan bool)
+	ErrChannel := make(chan error)
 	for i, job := range exec.Raw.Jobs {
-		//wg.Add(1)
-		go func(jobs []*Job, job InnerJob) {
+		wg.Add(1)
+		go func(jobs []*Job, job InnerJob, i int) {
+			fmt.Println(i, job.Name)
 			ji, err := j.GetJob(ctx, job.Name)
 			if err != nil {
 				ErrChannel <- err
 			}
 			jobs[i] = ji
-		}(jobs, job)
+			wg.Done()
+		}(jobs, job, i)
 	}
-
-	for {
-		if len(jobs) == len(exec.Raw.Jobs) {
-			break
-		}
-		err = <-ErrChannel
+	go func() {
+		wg.Wait()
+		close(wgDone)
+	}()
+	select {
+	case <-wgDone:
+		break
+	case err := <-ErrChannel:
 		if err != nil {
+			close(ErrChannel)
 			return nil, err
 		}
 	}
