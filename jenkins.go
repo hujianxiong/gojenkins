@@ -440,7 +440,6 @@ func (j *Jenkins) GetAllJobs(ctx context.Context) ([]*Job, error) {
 	for i, job := range exec.Raw.Jobs {
 		wg.Add(1)
 		go func(jobs []*Job, job InnerJob, i int) {
-			fmt.Println(i, job.Name)
 			ji, err := j.GetJob(ctx, job.Name)
 			if err != nil {
 				ErrChannel <- err
